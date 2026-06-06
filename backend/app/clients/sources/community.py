@@ -30,6 +30,29 @@ def _pick(data: dict[str, Any], *names: str, default: Any = None) -> Any:
     return default
 
 
+def _normalize_faction(value: Any) -> tuple[int, str]:
+    if isinstance(value, int):
+        return value, faction_name(value)
+    if isinstance(value, str):
+        cleaned = value.strip().upper().replace("-", "_").replace(" ", "_")
+        aliases = {
+            "HUMAN": 1,
+            "HUMANS": 1,
+            "SUPER_EARTH": 1,
+            "TERMINID": 2,
+            "TERMINIDS": 2,
+            "AUTOMATON": 3,
+            "AUTOMATONS": 3,
+            "ILLUMINATE": 4,
+        }
+        if cleaned.isdigit():
+            faction_id = int(cleaned)
+            return faction_id, faction_name(faction_id)
+        faction_id = aliases.get(cleaned, 1)
+        return faction_id, faction_name(faction_id)
+    return 1, faction_name(1)
+
+
 class CommunitySource:
     name = "community"
 
@@ -91,10 +114,8 @@ class CommunitySource:
         liberation = _pick(data, "liberationPct", "liberation", "liberationPercentage", default=None)
         if liberation is None:
             liberation = max(0.0, min(100.0, (1.0 - health / max(max_health, 1)) * 100.0))
-        owner = int(_pick(data, "owner", "currentOwner", "initialOwner", default=1) or 1)
-        current_owner = str(_pick(data, "currentOwner", "current_owner", default=faction_name(owner)))
-        if current_owner.isdigit():
-            current_owner = faction_name(int(current_owner))
+        owner_value = _pick(data, "owner", "currentOwner", "initialOwner", default=1)
+        owner, current_owner = _normalize_faction(owner_value)
         position_data = _as_dict(_pick(data, "position", default={}))
         return Planet(
             index=int(_pick(data, "index", default=0)),

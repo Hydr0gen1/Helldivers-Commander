@@ -51,3 +51,22 @@ def test_normalize_assignment_accepts_reward_object() -> None:
     assert len(orders) == 1
     assert orders[0].tasks[0].value_types == [4]
     assert orders[0].rewards[0].amount == 45
+
+
+def test_normalize_planet_accepts_live_string_factions() -> None:
+    planet = source().normalize_planet(
+        {
+            "index": 0,
+            "name": "SUPER EARTH",
+            "position": {"x": 0, "y": 0},
+            "maxHealth": 1000000,
+            "health": 1000000,
+            "initialOwner": "Humans",
+            "currentOwner": "Humans",
+        }
+    )
+
+    assert planet.owner == 1
+    assert planet.current_owner == "SUPER_EARTH"
+    assert planet.position.x == 0.0
+    assert planet.position.y == 0.0
