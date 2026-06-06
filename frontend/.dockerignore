@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log*
+.DS_Store
+.env
+.git
+.gitignore
+Dockerfile
+dist
+*.tsbuildinfo
+coverage
+.vite
