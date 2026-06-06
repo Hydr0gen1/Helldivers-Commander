@@ -119,3 +119,53 @@ def test_normalize_war_uses_start_date_plus_war_relative_time() -> None:
     )
 
     assert war.time == datetime.fromtimestamp(1_700_003_600, tz=timezone.utc)
+
+
+def test_normalize_assignment_unwraps_localized_text_fields() -> None:
+    orders = source().normalize_assignments(
+        [
+            {
+                "id": 100,
+                "title": {"de": "Verteidigen", "en-US": "Defend the line"},
+                "briefing": {"en": "Briefing text"},
+                "description": {"fr": "Texte", "en-US": "Description text"},
+                "expiration": "2026-06-07T00:00:00Z",
+                "tasks": [],
+                "rewards": [],
+            }
+        ]
+    )
+
+    assert len(orders) == 1
+    assert orders[0].title == "Defend the line"
+    assert orders[0].briefing == "Briefing text"
+    assert orders[0].description == "Description text"
+
+
+def test_normalize_dispatches_keeps_localized_message() -> None:
+    dispatches = source().normalize_dispatches(
+        [
+            {
+                "id": 501,
+                "published": "2026-06-06T00:00:00Z",
+                "type": 2,
+                "message": {"en-US": "Localized dispatch online.", "de": "Lokalisierte Meldung online."},
+            }
+        ]
+    )
+
+    assert len(dispatches) == 1
+    assert dispatches[0].message == "Localized dispatch online."
+
+
+def test_normalize_war_uses_resolved_war_id_when_payload_omits_it() -> None:
+    war = source().normalize_war(
+        {
+            "time": "2026-06-06T00:00:00Z",
+            "impactMultiplier": 1.0,
+            "statistics": {},
+        },
+        resolved_war_id=802,
+    )
+
+    assert war.war_id == 802

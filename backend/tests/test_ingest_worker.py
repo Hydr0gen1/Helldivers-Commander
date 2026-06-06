@@ -56,3 +56,28 @@ async def test_campaign_tick_populates_campaign_cache() -> None:
     await worker.tick_campaigns()
 
     assert await cache.get(CACHE_CAMPAIGNS) == {"campaigns": [{"planetIndex": 42, "type": 1}]}
+
+
+class WarIdCommunity:
+    name = "community"
+
+    async def resolve_war_id(self) -> int:
+        return 987
+
+    async def fetch_war(self) -> dict[str, object]:
+        return {"time": "2026-06-06T00:00:00Z", "impactMultiplier": 1.0, "statistics": {}}
+
+    def normalize_war(self, raw: object, *, resolved_war_id: int | None = None) -> object:
+        return {"warId": resolved_war_id}
+
+
+@pytest.mark.asyncio
+async def test_upstream_threads_resolved_war_id_into_war_normalizer() -> None:
+    from app.clients.upstream import UpstreamClient
+
+    upstream = UpstreamClient(WarIdCommunity())  # type: ignore[arg-type]
+
+    await upstream.resolve_war_id()
+    war = await upstream.get_war()
+
+    assert war == {"warId": 987}

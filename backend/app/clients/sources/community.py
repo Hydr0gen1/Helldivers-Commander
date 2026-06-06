@@ -29,6 +29,25 @@ def _pick(data: dict[str, Any], *names: str, default: Any = None) -> Any:
     return default
 
 
+def localized(value: Any, prefer: tuple[str, ...] = ("en-US", "en")) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        if not value:
+            return None
+        for language in prefer:
+            text = value.get(language)
+            if isinstance(text, str):
+                return text
+        for text in value.values():
+            if isinstance(text, str):
+                return text
+        return None
+    return None
+
+
 _FACTION_NAME_TO_ID = {
     "humans": 1,
     "human": 1,
@@ -100,11 +119,11 @@ class CommunitySource:
     async def fetch_campaigns(self) -> Any:
         return await self._http.get_json(f"{self._base}/api/v1/campaigns")
 
-    def normalize_war(self, raw: Any) -> War:
+    def normalize_war(self, raw: Any, *, resolved_war_id: int | None = None) -> War:
         data = _as_dict(raw)
         try:
             return War(
-                war_id=int(_pick(data, "warId", "war_id", default=0)),
+                war_id=int(_pick(data, "warId", "war_id", default=resolved_war_id or 0) or resolved_war_id or 0),
                 time=self._normalize_time(_pick(data, "time", default=0), data),
                 impact_multiplier=float(_pick(data, "impactMultiplier", "impact_multiplier", default=1.0)),
                 statistics=self._normalize_statistics(_pick(data, "statistics", "stats", default={})),
@@ -170,9 +189,9 @@ class CommunitySource:
                 orders.append(
                     Order(
                         id=int(_pick(data, "id", default=0)),
-                        title=str(_pick(data, "title", default="")),
-                        briefing=str(_pick(data, "briefing", default="")),
-                        description=str(_pick(data, "description", default="")),
+                        title=localized(_pick(data, "title", default="")) or "",
+                        briefing=localized(_pick(data, "briefing", default="")) or "",
+                        description=localized(_pick(data, "description", default="")) or "",
                         type=int(_pick(data, "type", default=0) or 0),
                         flags=int(_pick(data, "flags", default=0) or 0),
                         expiration=expiration or datetime.now(timezone.utc),
@@ -196,7 +215,7 @@ class CommunitySource:
                         id=int(_pick(data, "id", default=0)),
                         published=self._normalize_time(_pick(data, "published", default=0), data),
                         type=int(_pick(data, "type", default=0) or 0),
-                        message=_pick(data, "message", default=None),
+                        message=localized(_pick(data, "message", default=None)),
                     )
                 )
             except (TypeError, ValueError, ValidationError) as exc:

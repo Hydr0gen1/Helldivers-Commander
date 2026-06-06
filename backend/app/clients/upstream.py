@@ -31,7 +31,7 @@ class UpstreamClient:
 
     async def get_war(self) -> War:
         raw = await self._call_source(self._community.name, self._community.fetch_war)
-        return self._community.normalize_war(raw)
+        return self._community.normalize_war(raw, resolved_war_id=self.war_id)
 
     async def get_planets(self) -> list[Planet]:
         raw = await self._call_source(self._community.name, self._community.fetch_planets)
