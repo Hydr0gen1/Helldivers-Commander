@@ -58,6 +58,16 @@ class Derived(CamelModel):
     trend: Literal["accelerating", "steady", "stalling", "losing"] = "steady"
 
 
+class PlanetHistoryPoint(CamelModel):
+    ts: datetime
+    liberation_pct: float
+    players: int
+
+
+class PlanetHistoryResponse(CamelModel):
+    history: list[PlanetHistoryPoint]
+
+
 class Planet(CamelModel):
     index: int
     name: str

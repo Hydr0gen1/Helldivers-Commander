@@ -81,3 +81,50 @@ async def test_upstream_threads_resolved_war_id_into_war_normalizer() -> None:
     war = await upstream.get_war()
 
     assert war == {"warId": 987}
+
+from datetime import datetime, timezone
+
+from app.models.domain import Planet, War
+
+
+class SnapshotUpstream(FailingUpstream):
+    async def get_war(self) -> War:
+        return War(war_id=1, time=datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc), impact_multiplier=1.5)
+
+    async def get_planets(self) -> list[Planet]:
+        return [Planet(index=7, name="Mort", health=500_000, max_health=1_000_000, liberation_pct=50.0, players=123)]
+
+
+class RecordingPersistence:
+    enabled = False
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    async def write_planet_tick(self, *, war: War, planets: list[Planet], campaigns: list[dict[str, object]]) -> None:
+        self.calls.append({"war": war, "planets": planets, "campaigns": campaigns})
+
+    async def write_orders(self, orders: list[object]) -> None:
+        pass
+
+    async def write_dispatches(self, dispatches: list[object]) -> None:
+        pass
+
+
+@pytest.mark.asyncio
+async def test_war_planets_tick_writes_snapshot_batch() -> None:
+    cache = InProcTTLCache()
+    persistence = RecordingPersistence()
+    worker = IngestWorker(
+        SnapshotUpstream(),
+        cache,
+        Settings(ingest_interval_seconds=30),
+        persistence=persistence,  # type: ignore[arg-type]
+    )
+
+    await worker.tick_war_and_planets()
+
+    assert len(persistence.calls) == 1
+    call = persistence.calls[0]
+    assert call["war"] == War(war_id=1, time=datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc), impact_multiplier=1.5)
+    assert [planet.index for planet in call["planets"]] == [7]

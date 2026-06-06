@@ -31,6 +31,14 @@ export interface Derived {
   trend: 'accelerating' | 'steady' | 'stalling' | 'losing';
 }
 
+export interface PlanetHistoryPoint {
+  ts: string;
+  liberationPct: number;
+  players: number;
+}
+
+export interface PlanetHistoryResponse { history: PlanetHistoryPoint[]; }
+
 export interface Planet {
   index: number;
   name: string;
