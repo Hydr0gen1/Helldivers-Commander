@@ -9,6 +9,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.cache import Cache
 from app.clients.upstream import UpstreamClient
 from app.config import Settings
+from app.clients.sources.training import TrainingManualSource
+from app.models.db import DatabasePersistence
 from app.models.domain import DispatchesResponse, OrdersResponse, PlanetsResponse
 
 logger = logging.getLogger(__name__)
@@ -22,10 +24,19 @@ CACHE_LAST_INGEST = "last_ingest"
 
 
 class IngestWorker:
-    def __init__(self, upstream: UpstreamClient, cache: Cache, settings: Settings) -> None:
+    def __init__(
+        self,
+        upstream: UpstreamClient,
+        cache: Cache,
+        settings: Settings,
+        persistence: DatabasePersistence | None = None,
+        training_source: TrainingManualSource | None = None,
+    ) -> None:
         self._upstream = upstream
         self._cache = cache
         self._settings = settings
+        self._persistence = persistence or DatabasePersistence(None)
+        self._training_source = training_source
         self._scheduler = AsyncIOScheduler(timezone="UTC")
 
     async def start(self) -> None:
@@ -55,6 +66,10 @@ class IngestWorker:
             planets = await self._upstream.get_planets()
             await self._cache.set(CACHE_WAR, war, ttl_seconds=90)
             await self._cache.set(CACHE_PLANETS, PlanetsResponse(planets=planets), ttl_seconds=90)
+            cached_campaigns = await cached_or_empty(self._cache, CACHE_CAMPAIGNS, {"campaigns": []})
+            campaigns = cached_campaigns.get("campaigns", []) if isinstance(cached_campaigns, dict) else []
+            await self._persistence.write_planet_tick(war=war, planets=planets, campaigns=campaigns)
+            await self._bootstrap_history(planets)
             await self._mark_ingest()
             logger.info("ingest_war_planets_ok planets=%s", len(planets))
         except Exception as exc:  # scheduler boundary: log and keep next tick alive
@@ -73,6 +88,7 @@ class IngestWorker:
         try:
             orders = await self._upstream.get_orders()
             await self._cache.set(CACHE_ORDERS, OrdersResponse(orders=orders), ttl_seconds=330)
+            await self._persistence.write_orders(orders)
             await self._mark_ingest()
             logger.info("ingest_orders_ok count=%s", len(orders))
         except Exception as exc:  # scheduler boundary: log and keep next tick alive
@@ -82,10 +98,25 @@ class IngestWorker:
         try:
             dispatches = await self._upstream.get_dispatches()
             await self._cache.set(CACHE_DISPATCHES, DispatchesResponse(dispatches=dispatches), ttl_seconds=90)
+            await self._persistence.write_dispatches(dispatches)
             await self._mark_ingest()
             logger.info("ingest_dispatches_ok count=%s", len(dispatches))
         except Exception as exc:  # scheduler boundary: log and keep next tick alive
             logger.warning("ingest_dispatches_failed error=%r", exc)
+
+    async def _bootstrap_history(self, planets: list[Any]) -> None:
+        if self._training_source is None or not self._persistence.enabled:
+            return
+        for planet in planets:
+            try:
+                index = int(getattr(planet, "index"))
+                raw = await self._training_source.fetch_planet_history(index)
+                rows = self._training_source.normalize_history(raw)
+                inserted = await self._persistence.backfill_planet_history(index, rows)
+                if inserted:
+                    logger.info("history_bootstrap_ok planet_index=%s rows=%s", index, inserted)
+            except Exception as exc:
+                logger.warning("history_bootstrap_failed planet_index=%s error=%r", getattr(planet, "index", None), exc)
 
     async def _resolve_war_id(self) -> None:
         try:

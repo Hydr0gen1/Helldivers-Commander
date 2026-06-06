@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from fastapi import Request
 
 from app.cache import Cache
@@ -17,3 +18,7 @@ def get_upstream(request: Request) -> UpstreamClient:
 
 def get_briefing_generator(request: Request) -> BriefingGenerator:
     return request.app.state.briefing_generator
+
+
+def get_db_sessionmaker(request: Request) -> async_sessionmaker[AsyncSession] | None:
+    return request.app.state.db_sessionmaker

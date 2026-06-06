@@ -13,9 +13,11 @@ from app.briefing.llm import BriefingGenerator
 from app.cache import InProcTTLCache, RedisCache
 from app.clients.base import UpstreamHTTPClient
 from app.clients.sources.community import CommunitySource
+from app.clients.sources.training import TrainingManualSource
 from app.clients.upstream import UpstreamClient
 from app.config import settings
 from app.ingest.worker import IngestWorker
+from app.models.db import DatabasePersistence, create_engine_and_session
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -26,11 +28,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     cache = RedisCache(settings.redis_url) if settings.redis_url else InProcTTLCache()
     http = UpstreamHTTPClient(settings)
     community = CommunitySource(http, settings)
+    training = TrainingManualSource(http, settings)
     upstream = UpstreamClient(community)
-    worker = IngestWorker(upstream, cache, settings)
+    database = create_engine_and_session(settings.database_url)
+    db_engine = database[0] if database else None
+    db_sessionmaker = database[1] if database else None
+    persistence = DatabasePersistence(db_sessionmaker)
+    worker = IngestWorker(upstream, cache, settings, persistence=persistence, training_source=training)
     app.state.cache = cache
     app.state.http = http
     app.state.upstream = upstream
+    app.state.db_engine = db_engine
+    app.state.db_sessionmaker = db_sessionmaker
     app.state.worker = worker
     app.state.briefing_generator = BriefingGenerator()
     await worker.start()
@@ -38,6 +47,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         await worker.stop()
+        if db_engine is not None:
+            await db_engine.dispose()
         await http.close()
 
 
