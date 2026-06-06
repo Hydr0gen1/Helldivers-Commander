@@ -1,4 +1,6 @@
-import type { Order } from '../api/types';
+import type { Order, Task } from '../api/types';
+
+const TARGET_VALUE_TYPE_IDS = new Set([3]);
 
 function countdown(expiration: string): string {
   const ms = new Date(expiration).getTime() - Date.now();
@@ -6,6 +8,38 @@ function countdown(expiration: string): string {
   const hours = Math.floor(ms / 3_600_000);
   const minutes = Math.floor((ms % 3_600_000) / 60_000);
   return `${hours}h ${minutes}m`;
+}
+
+function clampPercent(value: number): number {
+  return Math.max(0, Math.min(100, value));
+}
+
+function targetForTask(task: Task): number | null {
+  const targetIndex = task.valueTypes.findIndex((valueType) => TARGET_VALUE_TYPE_IDS.has(valueType));
+  if (targetIndex >= 0) {
+    const target = task.values[targetIndex];
+    return Number.isFinite(target) && target > 0 ? target : null;
+  }
+
+  const explicitPercentTarget = task.values.find((value) => value === 100);
+  return explicitPercentTarget ?? null;
+}
+
+function taskPercent(progress: number, task: Task): number {
+  const target = targetForTask(task);
+  if (target !== null) {
+    return clampPercent((progress / target) * 100);
+  }
+
+  return clampPercent(progress);
+}
+
+function progressLabel(progress: number, task: Task): string {
+  const target = targetForTask(task);
+  if (target === null || target === 100) {
+    return `${taskPercent(progress, task).toFixed(0)}%`;
+  }
+  return `${progress.toLocaleString()} / ${target.toLocaleString()}`;
 }
 
 interface OrderTrackerProps {
@@ -26,17 +60,22 @@ export function OrderTracker({ orders }: OrderTrackerProps): JSX.Element {
             </div>
             <p className="mt-2 line-clamp-4 text-sm text-slate-300">{order.description || order.briefing}</p>
             <div className="mt-3 space-y-2">
-              {order.tasks.map((task, index) => (
-                <div key={`${order.id}-${index}`}>
-                  <div className="mb-1 flex justify-between text-xs text-slate-400">
-                    <span>Task {index + 1}</span>
-                    <span>{order.progress[index] ?? 0}</span>
+              {order.tasks.map((task, index) => {
+                // Major Order task structures vary by order; valueTypes identifies which value is the target/goal.
+                const progress = order.progress[index] ?? 0;
+                const percent = taskPercent(progress, task);
+                return (
+                  <div key={`${order.id}-${index}`}>
+                    <div className="mb-1 flex justify-between text-xs text-slate-400">
+                      <span>Task {index + 1}</span>
+                      <span>{progressLabel(progress, task)}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                      <div className="h-full rounded-full bg-yellow-300" style={{ width: `${percent}%` }} />
+                    </div>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-800">
-                    <div className="h-full rounded-full bg-yellow-300" style={{ width: `${Math.min(order.progress[index] ?? 0, 100)}%` }} />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </article>
         ))}

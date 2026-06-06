@@ -23,7 +23,11 @@ function App(): JSX.Element {
     setSelected((current) => current ? response.planets.find((planet) => planet.index === current.index) ?? current : response.planets[0] ?? null);
   }, []);
 
-  useWarStream({ onPlanets: applyPlanets, onError: (err) => setError(err.message) });
+  const handleStreamError = useCallback((err: Error) => {
+    setError(err.message);
+  }, []);
+
+  useWarStream({ onPlanets: applyPlanets, onError: handleStreamError });
 
   useEffect(() => {
     const refresh = async (): Promise<void> => {

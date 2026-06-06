@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { PlanetsResponse } from '../api/types';
 
 interface UseWarStreamOptions {
@@ -7,20 +7,26 @@ interface UseWarStreamOptions {
 }
 
 export function useWarStream({ onPlanets, onError }: UseWarStreamOptions): void {
+  const onPlanetsRef = useRef(onPlanets);
+  const onErrorRef = useRef(onError);
+
+  onPlanetsRef.current = onPlanets;
+  onErrorRef.current = onError;
+
   useEffect(() => {
     let polling: number | undefined;
     const poll = async (): Promise<void> => {
       try {
         const response = await fetch('/api/v1/planets');
-        onPlanets((await response.json()) as PlanetsResponse);
+        onPlanetsRef.current((await response.json()) as PlanetsResponse);
       } catch (error) {
-        onError?.(error instanceof Error ? error : new Error('polling failed'));
+        onErrorRef.current?.(error instanceof Error ? error : new Error('polling failed'));
       }
     };
 
     const events = new EventSource('/sse');
     events.addEventListener('planets', (event) => {
-      onPlanets(JSON.parse((event as MessageEvent<string>).data) as PlanetsResponse);
+      onPlanetsRef.current(JSON.parse((event as MessageEvent<string>).data) as PlanetsResponse);
     });
     events.onerror = () => {
       events.close();
@@ -34,5 +40,6 @@ export function useWarStream({ onPlanets, onError }: UseWarStreamOptions): void 
         window.clearInterval(polling);
       }
     };
-  }, [onError, onPlanets]);
+    // The EventSource is created once per mount; refs keep callbacks current so planet state updates do not reconnect SSE.
+  }, []);
 }
