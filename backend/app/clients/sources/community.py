@@ -155,8 +155,8 @@ class CommunitySource:
         position_data = _as_dict(_pick(data, "position", default={}))
         return Planet(
             index=int(_pick(data, "index", default=0)),
-            name=str(_pick(data, "name", default=f"Planet {data.get('index', 0)}")),
-            sector=str(_pick(data, "sector", default="UNKNOWN")),
+            name=localized(_pick(data, "name", default=None)) or f"Planet {data.get('index', 0)}",
+            sector=localized(_pick(data, "sector", default=None)) or str(_pick(data, "sector", default="UNKNOWN")),
             biome=_pick(data, "biome", default=None),
             position=Position(x=float(position_data.get("x", 0.0)), y=float(position_data.get("y", 0.0))),
             waypoints=[int(value) for value in _as_list(_pick(data, "waypoints", default=[]))],
@@ -232,7 +232,7 @@ class CommunitySource:
             missions_won=int(_pick(data, "missionsWon", "missions_won", default=0) or 0),
             missions_lost=int(_pick(data, "missionsLost", "missions_lost", default=0) or 0),
             mission_time=int(_pick(data, "missionTime", "mission_time", default=0) or 0),
-            terminid_kills=int(_pick(data, "terminidKills", "terminid_kills", default=0) or 0),
+            terminid_kills=int(_pick(data, "terminidKills", "terminid_kills", "bugKills", "bug_kills", default=0) or 0),
             automaton_kills=int(_pick(data, "automatonKills", "automaton_kills", default=0) or 0),
             illuminate_kills=int(_pick(data, "illuminateKills", "illuminate_kills", default=0) or 0),
             bullets_fired=int(_pick(data, "bulletsFired", "bullets_fired", default=0) or 0),
@@ -242,7 +242,7 @@ class CommunitySource:
             revives=int(_pick(data, "revives", default=0) or 0),
             friendlies=int(_pick(data, "friendlies", default=0) or 0),
             mission_success_rate=int(_pick(data, "missionSuccessRate", "mission_success_rate", default=0) or 0),
-            accuracy=int(_pick(data, "accuracy", default=0) or 0),
+            accuracy=int(_pick(data, "accuracy", "accurracy", default=0) or 0),
             player_count=int(_pick(data, "playerCount", "player_count", default=0) or 0),
         )
 

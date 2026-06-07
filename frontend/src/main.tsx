@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { api } from './api/client';
-import type { Dispatch, Order, Planet, War } from './api/types';
+import type { Dispatch, HealthResponse, Order, Planet, War } from './api/types';
 import { DispatchFeed } from './components/DispatchFeed';
 import { OrderTracker } from './components/OrderTracker';
 import { PlanetPanel } from './components/PlanetPanel';
@@ -16,6 +16,7 @@ function App(): JSX.Element {
   const [orders, setOrders] = useState<Order[]>([]);
   const [dispatches, setDispatches] = useState<Dispatch[]>([]);
   const [war, setWar] = useState<War | null>(null);
+  const [health, setHealth] = useState<HealthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const applyPlanets = useCallback((response: { planets: Planet[] }) => {
@@ -42,6 +43,11 @@ function App(): JSX.Element {
         setOrders(orderResponse.orders);
         setDispatches(dispatchResponse.dispatches.slice().reverse());
         setWar(warResponse);
+        try {
+          setHealth(await api.health());
+        } catch {
+          setHealth(null);
+        }
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'WarDesk API unavailable');
@@ -59,7 +65,10 @@ function App(): JSX.Element {
           <p className="text-xs uppercase tracking-[0.45em] text-terminal">Super Earth Tactical Console</p>
           <h1 className="text-4xl font-black uppercase tracking-[0.15em] text-cyan-100">WarDesk</h1>
         </div>
-        <p className="text-sm text-slate-400">Browser traffic terminates at WarDesk. Upstream APIs are polled only by the backend worker.</p>
+        <div className="space-y-2 text-sm text-slate-400 md:text-right">
+          <p>Browser traffic terminates at WarDesk. Upstream APIs are polled only by the backend worker.</p>
+          <SourceStatus health={health} />
+        </div>
       </header>
       {error ? <div className="rounded border border-red-500/40 bg-red-950/40 p-3 text-sm text-red-100">{error}</div> : null}
       <WarStats war={war} planetCount={planets.length} />
@@ -72,6 +81,19 @@ function App(): JSX.Element {
       </div>
       <DispatchFeed dispatches={dispatches} />
     </main>
+  );
+}
+
+function SourceStatus({ health }: { health: HealthResponse | null }): JSX.Element {
+  const entries = Object.entries(health?.sources ?? {});
+  const title = entries.length ? entries.map(([source, status]) => `${source}: ${status}`).join(' • ') : 'source health unavailable';
+  const aggregate = entries.some(([, status]) => status === 'up') ? 'up' : entries.some(([, status]) => status === 'open') ? 'open' : 'down';
+  const color = aggregate === 'up' ? 'bg-emerald-400 shadow-emerald-400/70' : aggregate === 'open' ? 'bg-amber-300 shadow-amber-300/70' : 'bg-red-500 shadow-red-500/70';
+  return (
+    <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-500" title={title}>
+      <span className={`h-2.5 w-2.5 rounded-full shadow ${color}`} aria-hidden="true" />
+      <span>Sources</span>
+    </div>
   );
 }
 

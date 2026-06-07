@@ -112,4 +112,4 @@ export interface OrdersResponse { orders: Order[]; }
 export interface DispatchesResponse { dispatches: Dispatch[]; }
 export interface CampaignsResponse { campaigns: Record<string, unknown>[]; }
 export interface BriefingResponse { text: string; generatedAt: string; }
-export interface HealthResponse { sources: Record<string, 'up' | 'down'>; lastIngest: string | null; }
+export interface HealthResponse { sources: Record<string, 'up' | 'down' | 'open'>; lastIngest: string | null; }
