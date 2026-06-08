@@ -108,6 +108,7 @@ export interface Gambit {
 }
 
 export interface PlanetsResponse { planets: Planet[]; }
+export interface GambitsResponse { gambits: Gambit[]; }
 export interface OrdersResponse { orders: Order[]; }
 export interface DispatchesResponse { dispatches: Dispatch[]; }
 export interface CampaignsResponse { campaigns: Record<string, unknown>[]; }
