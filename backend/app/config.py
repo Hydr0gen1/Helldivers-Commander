@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     ingest_interval_seconds: int = 45
     rate_limit_guard: bool = True
     community_base_url: HttpUrl = Field(default="https://api.helldivers2.dev")
+    diveharder_base_url: HttpUrl = Field(default="https://api.diveharder.com")
+    upstream_breaker_failure_threshold: int = 3
+    upstream_breaker_cooldown_seconds: int = 60
     training_manual_base_url: HttpUrl = Field(default="https://helldiverstrainingmanual.com")
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"])
 

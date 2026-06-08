@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 import pytest
 
 from app.cache import InProcTTLCache
 from app.config import Settings
 from app.ingest.worker import CACHE_CAMPAIGNS, IngestWorker
+from app.models.domain import Planet, War
 
 
 class FailingUpstream:
@@ -81,10 +83,6 @@ async def test_upstream_threads_resolved_war_id_into_war_normalizer() -> None:
     war = await upstream.get_war()
 
     assert war == {"warId": 987}
-
-from datetime import datetime, timezone
-
-from app.models.domain import Planet, War
 
 
 class SnapshotUpstream(FailingUpstream):
