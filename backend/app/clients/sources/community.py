@@ -124,7 +124,11 @@ class CommunitySource:
         try:
             return War(
                 war_id=int(_pick(data, "warId", "war_id", default=resolved_war_id or 0) or resolved_war_id or 0),
-                time=self._normalize_time(_pick(data, "time", default=0), data),
+                time=self._normalize_time(
+                    _pick(data, "time", default=0),
+                    data,
+                    start_date=self._remember_start_date(self._extract_start_date(data)),
+                ),
                 impact_multiplier=float(_pick(data, "impactMultiplier", "impact_multiplier", default=1.0)),
                 statistics=self._normalize_statistics(_pick(data, "statistics", "stats", default={})),
             )
@@ -155,8 +159,8 @@ class CommunitySource:
         position_data = _as_dict(_pick(data, "position", default={}))
         return Planet(
             index=int(_pick(data, "index", default=0)),
-            name=str(_pick(data, "name", default=f"Planet {data.get('index', 0)}")),
-            sector=str(_pick(data, "sector", default="UNKNOWN")),
+            name=localized(_pick(data, "name", default=None)) or f"Planet {data.get('index', 0)}",
+            sector=localized(_pick(data, "sector", default=None)) or str(_pick(data, "sector", default="UNKNOWN")),
             biome=_pick(data, "biome", default=None),
             position=Position(x=float(position_data.get("x", 0.0)), y=float(position_data.get("y", 0.0))),
             waypoints=[int(value) for value in _as_list(_pick(data, "waypoints", default=[]))],
@@ -205,7 +209,9 @@ class CommunitySource:
         return orders
 
     def normalize_dispatches(self, raw: Any) -> list[Dispatch]:
-        items = _as_list(raw) or _as_list(_as_dict(raw).get("dispatches")) or _as_list(_as_dict(raw).get("news"))
+        container = _as_dict(raw)
+        start_date = self._remember_start_date(self._extract_start_date(container))
+        items = _as_list(raw) or _as_list(container.get("dispatches")) or _as_list(container.get("news"))
         dispatches: list[Dispatch] = []
         for item in items:
             data = _as_dict(item)
@@ -213,14 +219,18 @@ class CommunitySource:
                 dispatches.append(
                     Dispatch(
                         id=int(_pick(data, "id", default=0)),
-                        published=self._normalize_time(_pick(data, "published", default=0), data),
+                        published=self._normalize_time(
+                            _pick(data, "published", default=0),
+                            data,
+                            start_date=self._extract_start_date(data) or start_date,
+                        ),
                         type=int(_pick(data, "type", default=0) or 0),
                         message=localized(_pick(data, "message", default=None)),
                     )
                 )
             except (TypeError, ValueError, ValidationError) as exc:
                 logger.warning("normalize_dispatch_skipped error=%r", exc)
-        return dispatches
+        return sorted(dispatches, key=lambda dispatch: dispatch.published)
 
     def normalize_campaigns(self, raw: Any) -> list[dict[str, Any]]:
         items = _as_list(raw) or _as_list(_as_dict(raw).get("campaigns"))
@@ -232,7 +242,7 @@ class CommunitySource:
             missions_won=int(_pick(data, "missionsWon", "missions_won", default=0) or 0),
             missions_lost=int(_pick(data, "missionsLost", "missions_lost", default=0) or 0),
             mission_time=int(_pick(data, "missionTime", "mission_time", default=0) or 0),
-            terminid_kills=int(_pick(data, "terminidKills", "terminid_kills", default=0) or 0),
+            terminid_kills=int(_pick(data, "terminidKills", "terminid_kills", "bugKills", "bug_kills", default=0) or 0),
             automaton_kills=int(_pick(data, "automatonKills", "automaton_kills", default=0) or 0),
             illuminate_kills=int(_pick(data, "illuminateKills", "illuminate_kills", default=0) or 0),
             bullets_fired=int(_pick(data, "bulletsFired", "bullets_fired", default=0) or 0),
@@ -242,18 +252,31 @@ class CommunitySource:
             revives=int(_pick(data, "revives", default=0) or 0),
             friendlies=int(_pick(data, "friendlies", default=0) or 0),
             mission_success_rate=int(_pick(data, "missionSuccessRate", "mission_success_rate", default=0) or 0),
-            accuracy=int(_pick(data, "accuracy", default=0) or 0),
+            accuracy=int(_pick(data, "accuracy", "accurracy", default=0) or 0),
             player_count=int(_pick(data, "playerCount", "player_count", default=0) or 0),
         )
 
-    def _normalize_time(self, value: Any, context: dict[str, Any]) -> datetime:
+    def _normalize_time(self, value: Any, context: dict[str, Any], *, start_date: int | None = None) -> datetime:
         if isinstance(value, str):
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
             return parsed.astimezone(timezone.utc)
         numeric = int(value or 0)
-        start = _pick(context, "startDate", default=None) or self._war_start_unix
+        start = start_date or self._extract_start_date(context) or self._war_start_unix
         if start is not None and numeric < 100_000_000:
             return utc_from_unix(int(start) + numeric)
         if numeric > 0:
             return utc_from_unix(numeric)
         return datetime.now(timezone.utc)
+
+    def _extract_start_date(self, context: dict[str, Any]) -> int | None:
+        direct = _pick(context, "startDate", "start_date", default=None)
+        if direct is not None:
+            return int(direct)
+        war_info = _as_dict(_pick(context, "war_info", "warInfo", default={}))
+        nested = _pick(war_info, "startDate", "start_date", default=None)
+        return int(nested) if nested is not None else None
+
+    def _remember_start_date(self, start_date: int | None) -> int | None:
+        if start_date is not None:
+            self._war_start_unix = start_date
+        return start_date

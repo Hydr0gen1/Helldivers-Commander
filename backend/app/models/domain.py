@@ -158,5 +158,5 @@ class BriefingResponse(CamelModel):
 
 
 class HealthResponse(CamelModel):
-    sources: dict[str, str]
+    sources: dict[str, Literal["up", "down", "open"]]
     last_ingest: datetime | None = None

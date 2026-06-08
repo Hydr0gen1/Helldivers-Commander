@@ -13,6 +13,8 @@ from app.briefing.llm import BriefingGenerator
 from app.cache import InProcTTLCache, RedisCache
 from app.clients.base import UpstreamHTTPClient
 from app.clients.sources.community import CommunitySource
+from app.clients.sources.diveharder import DiveHarderSource
+from app.clients.sources.raw import RawCommunitySource
 from app.clients.sources.training import TrainingManualSource
 from app.clients.upstream import UpstreamClient
 from app.config import settings
@@ -28,8 +30,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     cache = RedisCache(settings.redis_url) if settings.redis_url else InProcTTLCache()
     http = UpstreamHTTPClient(settings)
     community = CommunitySource(http, settings)
+    diveharder = DiveHarderSource(http, settings)
+    raw = RawCommunitySource(http, settings)
     training = TrainingManualSource(http, settings)
-    upstream = UpstreamClient(community)
+    upstream = UpstreamClient(community, diveharder, raw, settings)
     database = create_engine_and_session(settings.database_url)
     db_engine = database[0] if database else None
     db_sessionmaker = database[1] if database else None
