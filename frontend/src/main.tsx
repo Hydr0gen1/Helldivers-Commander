@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { api } from './api/client';
-import type { Dispatch, HealthResponse, Order, Planet, War } from './api/types';
+import type { Dispatch, Gambit, HealthResponse, Order, Planet, War } from './api/types';
 import { DispatchFeed } from './components/DispatchFeed';
 import { OrderTracker } from './components/OrderTracker';
 import { PlanetPanel } from './components/PlanetPanel';
@@ -16,6 +16,8 @@ function App(): JSX.Element {
   const [orders, setOrders] = useState<Order[]>([]);
   const [dispatches, setDispatches] = useState<Dispatch[]>([]);
   const [war, setWar] = useState<War | null>(null);
+  const [gambits, setGambits] = useState<Gambit[]>([]);
+  const [showGraphIntel, setShowGraphIntel] = useState(false);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,16 +35,18 @@ function App(): JSX.Element {
   useEffect(() => {
     const refresh = async (): Promise<void> => {
       try {
-        const [planetResponse, orderResponse, dispatchResponse, warResponse] = await Promise.all([
+        const [planetResponse, orderResponse, dispatchResponse, warResponse, graphResponse] = await Promise.all([
           api.planets(),
           api.orders(),
           api.dispatches(),
-          api.war()
+          api.war(),
+          api.gambits()
         ]);
         applyPlanets(planetResponse);
         setOrders(orderResponse.orders);
         setDispatches(dispatchResponse.dispatches.slice().reverse());
         setWar(warResponse);
+        setGambits(graphResponse.gambits);
         try {
           setHealth(await api.health());
         } catch {
@@ -73,9 +77,27 @@ function App(): JSX.Element {
       {error ? <div className="rounded border border-red-500/40 bg-red-950/40 p-3 text-sm text-red-100">{error}</div> : null}
       <WarStats war={war} planetCount={planets.length} />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <GalaxyMap planets={planets} selected={selected} onSelect={setSelected} />
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cyan-500/20 bg-black/40 px-4 py-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.24em] text-cyan-400/80">Supply-line graph intelligence</p>
+              <p className="text-sm text-slate-400">{gambits.length} gambit/siege/chokepoint detections cached by WarDesk.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowGraphIntel((current) => !current)}
+              className={`rounded border px-3 py-2 text-xs uppercase tracking-[0.2em] transition ${
+                showGraphIntel ? 'border-terminal/60 bg-terminal/15 text-terminal' : 'border-slate-600 bg-slate-900/80 text-slate-300 hover:border-cyan-400/60'
+              }`}
+              aria-pressed={showGraphIntel}
+            >
+              {showGraphIntel ? 'Hide intel' : 'Show intel'}
+            </button>
+          </div>
+          <GalaxyMap planets={planets} selected={selected} onSelect={setSelected} gambits={gambits} showGraphIntel={showGraphIntel} />
+        </section>
         <div className="space-y-6">
-          <PlanetPanel planet={selected} />
+          <PlanetPanel planet={selected} gambits={gambits} />
           <OrderTracker orders={orders} />
         </div>
       </div>

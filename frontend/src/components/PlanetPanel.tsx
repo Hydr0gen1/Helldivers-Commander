@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '../api/client';
-import type { Planet, PlanetHistoryPoint } from '../api/types';
+import type { Gambit, Planet, PlanetHistoryPoint } from '../api/types';
 
 interface PlanetPanelProps {
   planet: Planet | null;
+  gambits?: Gambit[];
 }
 
 function formatHours(hours: number | null | undefined): string {
@@ -24,7 +25,7 @@ function formatRate(rate: number | null | undefined): string {
   return `${rate > 0 ? '+' : ''}${rate.toFixed(2)}%/hr`;
 }
 
-export function PlanetPanel({ planet }: PlanetPanelProps): JSX.Element {
+export function PlanetPanel({ planet, gambits = [] }: PlanetPanelProps): JSX.Element {
   const [details, setDetails] = useState<Planet | null>(planet);
   const [history, setHistory] = useState<PlanetHistoryPoint[]>([]);
 
@@ -61,6 +62,10 @@ export function PlanetPanel({ planet }: PlanetPanelProps): JSX.Element {
   );
 
   const displayPlanet = details ?? planet;
+  const planetIntel = useMemo(
+    () => (displayPlanet === null ? [] : gambits.filter((gambit) => gambit.targetIndex === displayPlanet.index || gambit.sourceIndex === displayPlanet.index)),
+    [displayPlanet, gambits]
+  );
 
   if (displayPlanet === null) {
     return (
@@ -96,6 +101,17 @@ export function PlanetPanel({ planet }: PlanetPanelProps): JSX.Element {
         <div className="rounded bg-slate-900/80 p-3"><dt className="text-slate-400">Health</dt><dd>{displayPlanet.health.toLocaleString()}</dd></div>
         <div className="rounded bg-slate-900/80 p-3"><dt className="text-slate-400">Decay/sec</dt><dd>{displayPlanet.regenPerSecond.toFixed(2)}</dd></div>
       </dl>
+      {planetIntel.length ? (
+        <div className="mt-4 space-y-2 rounded border border-yellow-400/30 bg-yellow-950/20 p-3">
+          <div className="text-xs uppercase tracking-[0.18em] text-yellow-200">Graph intelligence</div>
+          {planetIntel.map((gambit) => (
+            <div key={`${gambit.kind}-${gambit.sourceIndex}-${gambit.targetIndex}`} className="rounded bg-black/40 p-2 text-sm text-slate-100">
+              <span className="mr-2 rounded bg-yellow-400/15 px-2 py-0.5 text-xs font-semibold text-yellow-200">{gambit.kind}</span>
+              {gambit.note}
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-4 rounded bg-slate-950/80 p-3">
         <div className="mb-2 flex justify-between text-xs uppercase tracking-[0.18em] text-slate-400">
           <span>Liberation history</span>
