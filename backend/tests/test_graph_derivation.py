@@ -44,6 +44,17 @@ def test_fully_surrounded_enemy_planet_yields_siege() -> None:
     assert gambits[0].target_index == 2
 
 
+def test_surrounded_enemy_planet_with_active_campaign_is_not_siege() -> None:
+    planets = [
+        planet(1, waypoints=[2]),
+        planet(2, owner=3, waypoints=[1, 3]),
+        planet(3, waypoints=[2]),
+    ]
+
+    assert "SIEGE" not in kinds(planets, [{"planetIndex": 2}])
+    assert "SIEGE" in kinds(planets)
+
+
 def test_defense_with_weaker_source_yields_gambit() -> None:
     planets = [
         planet(10, owner=3, health=250, waypoints=[20], attacking=[20]),

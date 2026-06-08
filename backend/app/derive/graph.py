@@ -28,7 +28,7 @@ def find_gambits(planets: list[Planet], campaigns: list[dict[str, Any]] | None =
     campaign_items = campaigns or []
     results = [
         *_find_gambit_defenses(planets, campaign_items),
-        *_find_sieges(planets),
+        *_find_sieges(planets, campaign_items),
         *_find_chokepoints(planets, campaign_items),
     ]
     return _dedupe(results)
@@ -61,12 +61,13 @@ def _find_gambit_defenses(planets: list[Planet], campaigns: list[dict[str, Any]]
     return gambits
 
 
-def _find_sieges(planets: list[Planet]) -> list[Gambit]:
+def _find_sieges(planets: list[Planet], campaigns: list[dict[str, Any]]) -> list[Gambit]:
     by_index = {planet.index: planet for planet in planets}
+    active_campaign_planets = _campaign_planet_indices(campaigns)
     graph = build_supply_graph(planets)
     sieges: list[Gambit] = []
     for planet in planets:
-        if _is_super_earth(planet) or planet.attacking or planet.event:
+        if _is_super_earth(planet) or planet.attacking or planet.event or planet.index in active_campaign_planets:
             continue
         neighbors = [by_index[index] for index in graph.neighbors(planet.index) if index in by_index]
         if not neighbors:
@@ -108,6 +109,15 @@ def _find_chokepoints(planets: list[Planet], campaigns: list[dict[str, Any]]) ->
             note = f"{planet.name} is a front-line chokepoint; removing it splits the network into {disconnected_parts} components."
         chokepoints.append(Gambit(kind="CHOKEPOINT", source_index=index, target_index=index, note=note))
     return chokepoints
+
+
+def _campaign_planet_indices(campaigns: list[dict[str, Any]]) -> set[int]:
+    indices: set[int] = set()
+    for campaign in campaigns:
+        planet_index = _int_field(campaign, "planetIndex", "planet_index", "planet", "target", "targetIndex")
+        if planet_index is not None:
+            indices.add(planet_index)
+    return indices
 
 
 def _defense_requirements(planets: list[Planet], campaigns: list[dict[str, Any]]) -> dict[int, int]:
