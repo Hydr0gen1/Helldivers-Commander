@@ -42,13 +42,16 @@ class DiveHarderSource(CommunitySource):
         return await self._http.get_json(f"{self._base}/raw/major_order")
 
     async def fetch_dispatches(self) -> Any:
-        return await self._http.get_json(f"{self._base}/raw/news_feed")
+        war_info = _as_dict(await self._http.get_json(f"{self._base}/raw/war_info"))
+        news = await self._http.get_json(f"{self._base}/raw/news_feed")
+        return {"war_info": war_info, "news": news}
 
     async def fetch_campaigns(self) -> Any:
         status = await self._http.get_json(f"{self._base}/raw/status")
         return _as_list(_as_dict(status).get("campaigns"))
 
     def normalize_war(self, raw: Any, *, resolved_war_id: int | None = None) -> War:
+        self._remember_start_date(self._extract_start_date(_as_dict(raw)))
         return super().normalize_war(raw, resolved_war_id=resolved_war_id)
 
     def normalize_planets(self, raw: Any) -> list[Planet]:
@@ -72,6 +75,7 @@ class DiveHarderSource(CommunitySource):
         return super().normalize_assignments(_assignment_items(raw))
 
     def normalize_dispatches(self, raw: Any) -> list[Dispatch]:
+        self._remember_start_date(self._extract_start_date(_as_dict(raw)))
         return super().normalize_dispatches(raw)
 
     def _normalize_raw_planet_bundle(self, raw: dict[str, Any]) -> list[Planet]:

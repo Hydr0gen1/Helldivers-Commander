@@ -30,7 +30,7 @@ class RawCommunitySource(DiveHarderSource):
     async def _war_info(self) -> dict[str, Any]:
         war_id = await self._current_war_id()
         info = _as_dict(await self._http.get_json(f"{self._base}/raw/api/WarSeason/{war_id}/WarInfo"))
-        self._war_start_unix = int(_pick(info, "startDate", default=0) or 0) or self._war_start_unix
+        self._remember_start_date(self._extract_start_date(info))
         return info
 
     async def fetch_war(self) -> Any:
@@ -65,15 +65,13 @@ class RawCommunitySource(DiveHarderSource):
 
     def normalize_war(self, raw: Any, *, resolved_war_id: int | None = None) -> War:
         data = _as_dict(raw)
-        if _pick(data, "startDate", default=None) is not None:
-            self._war_start_unix = int(_pick(data, "startDate", default=0) or 0) or self._war_start_unix
+        self._remember_start_date(self._extract_start_date(data))
         return super().normalize_war(data, resolved_war_id=resolved_war_id or self._war_id)
 
     def normalize_planets(self, raw: Any) -> list[Planet]:
         data = _as_dict(raw)
         war_info = _as_dict(_pick(data, "war_info", "warInfo", default={}))
-        if _pick(war_info, "startDate", default=None) is not None:
-            self._war_start_unix = int(_pick(war_info, "startDate", default=0) or 0) or self._war_start_unix
+        self._remember_start_date(self._extract_start_date(war_info))
         return super().normalize_planets(raw)
 
     def normalize_assignments(self, raw: Any) -> list[Order]:
@@ -82,6 +80,5 @@ class RawCommunitySource(DiveHarderSource):
     def normalize_dispatches(self, raw: Any) -> list[Dispatch]:
         data = _as_dict(raw)
         war_info = _as_dict(_pick(data, "war_info", "warInfo", default={}))
-        if _pick(war_info, "startDate", default=None) is not None:
-            self._war_start_unix = int(_pick(war_info, "startDate", default=0) or 0) or self._war_start_unix
+        self._remember_start_date(self._extract_start_date(war_info))
         return super().normalize_dispatches(_pick(data, "news", "dispatches", default=raw))

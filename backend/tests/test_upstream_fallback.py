@@ -107,3 +107,44 @@ async def test_breaker_opens_after_consecutive_failures_and_recovers_after_coold
     assert war.war_id == 801
     assert community.calls == 3
     assert client.source_status["community"] == "up"
+
+
+class DispatchCommunity(FakeSource):
+    async def fetch_dispatches(self) -> Any:
+        self.calls += 1
+        raise httpx.ConnectError("dispatch boom")
+
+
+class DispatchDiveHarder(FakeSource):
+    async def fetch_dispatches(self) -> Any:
+        self.calls += 1
+        return {
+            "war_info": {"startDate": 1_700_000_000},
+            "news": [
+                {"id": 2, "published": 240, "type": 1, "message": "second"},
+                {"id": 1, "published": 120, "type": 1, "message": "first"},
+            ],
+        }
+
+    def normalize_dispatches(self, raw: Any) -> list[Any]:
+        from app.clients.sources.diveharder import DiveHarderSource
+        from app.config import settings
+
+        return DiveHarderSource(object(), settings).normalize_dispatches(raw)  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_fallback_uses_diveharder_war_clock_and_sorts() -> None:
+    community = DispatchCommunity("community")
+    diveharder = DispatchDiveHarder("diveharder")
+    client = UpstreamClient(community, diveharder)  # type: ignore[arg-type]
+
+    dispatches = await client.get_dispatches()
+
+    assert [dispatch.id for dispatch in dispatches] == [1, 2]
+    assert dispatches[0].published == datetime.fromtimestamp(1_700_000_120, tz=timezone.utc)
+    assert dispatches[1].published == datetime.fromtimestamp(1_700_000_240, tz=timezone.utc)
+    assert dispatches[0].published.year == 2023
+    assert dispatches[0].published.year != 1970
+    assert community.calls == 1
+    assert diveharder.calls == 1
