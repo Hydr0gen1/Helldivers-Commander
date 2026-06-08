@@ -51,17 +51,17 @@ def test_surrounded_enemy_planet_with_active_campaign_is_not_siege() -> None:
         planet(3, waypoints=[2]),
     ]
 
-    assert "SIEGE" not in kinds(planets, [{"planetIndex": 2}])
+    assert "SIEGE" not in kinds(planets, [{"planet": {"index": 2}}])
     assert "SIEGE" in kinds(planets)
 
 
 def test_defense_with_weaker_source_yields_gambit() -> None:
     planets = [
         planet(10, owner=3, health=250, waypoints=[20], attacking=[20]),
-        planet(20, owner=1, health=900, waypoints=[10], event={"health": 500}),
+        planet(20, owner=1, health=900, waypoints=[10]),
     ]
 
-    gambits = find_gambits(planets, [{"planetIndex": 20, "health": 500}])
+    gambits = find_gambits(planets, [{"planet": {"index": 20}, "health": 500}])
 
     assert [g.kind for g in gambits] == ["GAMBIT"]
     assert gambits[0].source_index == 10
@@ -72,11 +72,11 @@ def test_articulation_planet_on_active_front_yields_chokepoint() -> None:
     planets = [
         planet(1, owner=1, waypoints=[2]),
         planet(2, owner=1, waypoints=[1, 3, 4]),
-        planet(3, owner=3, waypoints=[2], attacking=[2]),
+        planet(3, owner=3, waypoints=[2]),
         planet(4, owner=1, waypoints=[2]),
     ]
 
-    gambits = find_gambits(planets)
+    gambits = find_gambits(planets, [{"planet": {"index": 3}}])
 
     assert any(g.kind == "CHOKEPOINT" and g.target_index == 2 for g in gambits)
 
@@ -95,10 +95,10 @@ def test_graph_gambits_endpoint_uses_cached_planets_and_campaigns() -> None:
     cache = InProcTTLCache()
     planets = [
         planet(10, owner=3, health=250, waypoints=[20], attacking=[20]),
-        planet(20, owner=1, health=900, waypoints=[10], event={"health": 500}),
+        planet(20, owner=1, health=900, waypoints=[10]),
     ]
     asyncio.run(cache.set(CACHE_PLANETS, PlanetsResponse(planets=planets), ttl_seconds=90))
-    asyncio.run(cache.set(CACHE_CAMPAIGNS, {"campaigns": [{"planetIndex": 20, "health": 500}]}, ttl_seconds=90))
+    asyncio.run(cache.set(CACHE_CAMPAIGNS, {"campaigns": [{"planet": {"index": 20}, "health": 500}]}, ttl_seconds=90))
 
     app = FastAPI()
     app.include_router(routes_graph.router)

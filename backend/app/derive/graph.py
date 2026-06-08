@@ -111,19 +111,23 @@ def _find_chokepoints(planets: list[Planet], campaigns: list[dict[str, Any]]) ->
     return chokepoints
 
 
-def _campaign_planet_indices(campaigns: list[dict[str, Any]]) -> set[int]:
-    indices: set[int] = set()
-    for campaign in campaigns:
-        planet_index = _int_field(campaign, "planetIndex", "planet_index", "planet", "target", "targetIndex")
+def _campaign_planet_index(campaign: dict[str, Any]) -> int | None:
+    planet = campaign.get("planet")
+    if isinstance(planet, dict):
+        planet_index = _int_field(planet, "index")
         if planet_index is not None:
-            indices.add(planet_index)
-    return indices
+            return planet_index
+    return _int_field(campaign, "planetIndex", "planet_index", "planet")
+
+
+def _campaign_planet_indices(campaigns: list[dict[str, Any]]) -> set[int]:
+    return {planet_index for campaign in campaigns if (planet_index := _campaign_planet_index(campaign)) is not None}
 
 
 def _defense_requirements(planets: list[Planet], campaigns: list[dict[str, Any]]) -> dict[int, int]:
     requirements: dict[int, int] = {}
     for campaign in campaigns:
-        planet_index = _int_field(campaign, "planetIndex", "planet_index", "planet", "target", "targetIndex")
+        planet_index = _campaign_planet_index(campaign)
         if planet_index is None:
             continue
         required_health = _health_requirement(campaign)
@@ -159,7 +163,7 @@ def _active_front_indices(planets: list[Planet], campaigns: list[dict[str, Any]]
             active.add(planet.index)
             active.update(planet.attacking)
     for campaign in campaigns:
-        planet_index = _int_field(campaign, "planetIndex", "planet_index", "planet", "target", "targetIndex")
+        planet_index = _campaign_planet_index(campaign)
         if planet_index is not None:
             active.add(planet_index)
     expanded = set(active)
@@ -172,7 +176,7 @@ def _active_front_indices(planets: list[Planet], campaigns: list[dict[str, Any]]
 def _has_active_conflict(planet: Planet, campaigns: list[dict[str, Any]]) -> bool:
     if planet.event or planet.attacking:
         return True
-    return any(_int_field(campaign, "planetIndex", "planet_index", "planet", "target", "targetIndex") == planet.index for campaign in campaigns)
+    return any(_campaign_planet_index(campaign) == planet.index for campaign in campaigns)
 
 
 def _touches_contested_edge(planet: Planet, by_index: dict[int, Planet], graph: nx.Graph) -> bool:
